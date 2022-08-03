@@ -38,6 +38,15 @@ def lambda_handler(event, context):
     
     print(f'Recived activate license request with args: hardware_id: {hardware_id} app_type: {app_type}')
     
+    count = col.count_documents({"hardware_id": hardware_id, "app_type": app_type})
+    if count > 0:
+        response = mqttclient.publish(
+            topic = response_topic,
+            qos=1,
+            payload= json.dumps({"success": True, "validLicense": False, "message": "License for this hardware_id and app_type already exist"})
+        )
+        return response
+
     license_key = ''.join(random.choice(string.ascii_lowercase) for i in range(15))
     
     print(f'Generated license_key: {license_key}')

@@ -49,7 +49,7 @@ def lambda_handler(event, context):
         )
         return response
     
-    if lic["hardware_id"] != hardware_id:
+    if lic.get("hardware_id") != hardware_id:
         response = mqttclient.publish(
             topic = response_topic,
             qos=1,
