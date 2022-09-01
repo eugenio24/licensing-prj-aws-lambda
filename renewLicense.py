@@ -83,7 +83,7 @@ def lambda_handler(event, context):
     
     client.close()
     
-    license = f'{license_key};{hardware_id};{app_type};{new_expiration}'.encode()
+    license = f'{license_key};{hardware_id};{function_checksum};{app_type};{new_expiration}'.encode()
     key = RSA.import_key(key_pem) 
     hash = SHA256.new(license)
 
