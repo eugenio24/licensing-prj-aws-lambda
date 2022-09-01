@@ -37,10 +37,10 @@ def lambda_handler(event, context):
     col = db.licensing
     
     hardware_id = event.get('hardware_id')
-    function_checksum = event.get('function_checksum')
     app_type = event.get('app_type')
+    license_key = event.get('license_key')
     
-    if hardware_id is None or app_type is None or function_checksum is None:
+    if license_key is None or hardware_id is None or app_type is None:
         response = mqttclient.publish(
             topic = response_topic,
             qos=1,
@@ -48,26 +48,42 @@ def lambda_handler(event, context):
         )
         return response
     
-    print(f'Recived activate license request with args: hardware_id: {hardware_id} function_checksum: {function_checksum} app_type: {app_type}')
+    print(f'Recived renew license request with args: license_key {license_key} hardware_id: {hardware_id} app_type: {app_type}')
     
-    count = col.count_documents({"hardware_id": hardware_id, "app_type": app_type})
-    if count > 0:
+    lic = col.find_one({'license_key': license_key})
+    
+    if lic is None:
         response = mqttclient.publish(
             topic = response_topic,
             qos=1,
-            payload= json.dumps({"success": True, "validLicense": False, "message": "License for this hardware_id and app_type already exist"})
+            payload= json.dumps({"success": True, "validLicense": False, "message": "License not found"})
+        )
+        return response
+    
+    if lic.get("hardware_id") != hardware_id:
+        response = mqttclient.publish(
+            topic = response_topic,
+            qos=1,
+            payload=json.dumps({"success": True, "validLicense": False, "message": "Hardware id not match"})
         )
         return response
 
-    license_key = ''.join(random.choice(string.ascii_lowercase) for i in range(15))
-    expiration = datetime.datetime.now() + datetime.timedelta(days = 30)
-    print(f'Generated license_key: {license_key} expires on: {expiration}')
+    if lic.get("app_type") != app_type:
+        response = mqttclient.publish(
+            topic = response_topic,
+            qos=1,
+            payload=json.dumps({"success": True, "validLicense": False, "message": "App type not match"})
+        )
+        return response
     
-    col.insert_one({'hardware_id': hardware_id, 'function_checksum': function_checksum, 'app_type': app_type, 'license_key': license_key, 'expiration': expiration })
+    new_expiration = datetime.datetime.now() + datetime.timedelta(days = 30)
+    print(f'New expiration for license_key: {license_key} expires on: {new_expiration}')
+    
+    col.find_one_and_update({'license_key': license_key}, { "$set": { "expiration": new_expiration } })
     
     client.close()
     
-    license = f'{license_key};{hardware_id};{function_checksum};{app_type};{expiration}'.encode()
+    license = f'{license_key};{hardware_id};{function_checksum};{app_type};{new_expiration}'.encode()
     key = RSA.import_key(key_pem) 
     hash = SHA256.new(license)
 
