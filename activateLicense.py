@@ -1,4 +1,4 @@
-nsimport json
+import json
 import boto3
 import pymongo
 import sys
